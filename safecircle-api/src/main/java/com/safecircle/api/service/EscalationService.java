@@ -160,14 +160,17 @@ public class EscalationService {
      * the database changes are also rolled back — no alert record without a queued job.
      */
     private void enqueueJob(Map<String, String> payload) {
-        try {
-            sqsTemplate.send(to -> to
-                .queue(notificationQueueName)
-                .payload(objectMapper.writeValueAsString(payload))
-            );
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize SQS job payload", e);
+        sqsTemplate.send(to -> {
+            try {
+                to
+                    .queue(notificationQueueName)
+                    .payload(objectMapper.writeValueAsString(payload));
+            } catch (JsonProcessingException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
+        );
     }
 
     private List<NotificationChannel> parseChannels(String[] notifyVia) {

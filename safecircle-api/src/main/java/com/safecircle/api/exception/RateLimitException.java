@@ -1,10 +1,10 @@
 package com.safecircle.api.exception;
 
-// ——— 404 Not Found ———
-public class NotFoundException extends RuntimeException {
+// ——— 429 Too Many Requests ———
+public class RateLimitException extends RuntimeException {
     private final String code;
 
-    public NotFoundException(String code, String message) {
+    public RateLimitException(String code, String message) {
         super(message);
         this.code = code;
     }

@@ -1,13 +1,14 @@
 package com.safecircle.api.exception;
 
-// ——— 404 Not Found ———
-public class NotFoundException extends RuntimeException {
+// ——— 409 Conflict ———
+public class ConflictException extends RuntimeException {
     private final String code;
 
-    public NotFoundException(String code, String message) {
+    public ConflictException(String code, String message) {
         super(message);
         this.code = code;
     }
 
     public String getCode() { return code; }
 }
+

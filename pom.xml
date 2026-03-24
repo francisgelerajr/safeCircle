@@ -50,6 +50,7 @@
         <jjwt.version>0.12.5</jjwt.version>
         <testcontainers.version>1.19.6</testcontainers.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <spring.boot.version>3.2.4</spring.boot.version>
     </properties>
 
     <!--
