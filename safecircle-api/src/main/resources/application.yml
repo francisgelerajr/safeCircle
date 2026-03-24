@@ -1,0 +1,91 @@
+# BASE CONFIGURATION
+# These values are shared across ALL environments (local, staging, prod).
+# Environment-specific files (application-local.yml, application-prod.yml)
+# override individual values using Spring's profile system.
+#
+# NEVER put secrets (passwords, API keys) in this file.
+# This file is committed to Git and visible to everyone on the team.
+
+spring:
+  application:
+    name: safecircle-api
+
+  # JPA / Hibernate configuration
+  jpa:
+    # CRITICAL: Never use create, create-drop, or update in production.
+    # validate: Hibernate checks that entities match the schema but makes no changes.
+    # Flyway is responsible for all schema changes — not Hibernate.
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # format_sql: true makes logged SQL readable — only enable for debugging
+        format_sql: false
+        # default_batch_fetch_size: when loading a list of entities with lazy
+        # relationships, Hibernate fetches related entities in batches of this size
+        # instead of one query per entity (the "N+1 problem").
+        default_batch_fetch_size: 20
+    open-in-view: false
+    # open-in-view: false is important. By default Spring Boot keeps the JPA
+    # EntityManager (database connection) open for the entire HTTP request lifecycle,
+    # even during JSON serialization. This holds DB connections longer than needed.
+    # Disabling it forces you to load all data you need in the service layer.
+
+  # Flyway migration configuration
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # Redis configuration — values overridden per environment
+  data:
+    redis:
+      timeout: 2000ms  # connection timeout — fail fast if Redis is unavailable
+
+  # Jackson (JSON serializer) configuration
+  jackson:
+    # Write dates as ISO 8601 strings ("2026-03-24T08:00:00Z"), not Unix timestamps
+    serialization:
+      write-dates-as-timestamps: false
+    # Ignore unknown JSON fields in requests — forward compatibility
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+# Spring Actuator — what endpoints to expose
+management:
+  endpoints:
+    web:
+      exposure:
+        # health: used by ECS to determine if container is healthy
+        # info: shows app version
+        # metrics: consumed by Micrometer → CloudWatch
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  # Exclude actuator from API rate limiting
+  server:
+    port: 8081  # actuator on a different port — not exposed to the internet via ALB
+
+# Application-specific configuration
+safecircle:
+  heartbeat:
+    # How often the mobile app should send a ping (in minutes).
+    # Returned in HeartbeatResponse.nextPingDue so the server controls the cadence.
+    ping-interval-minutes: 15
+    # Redis TTL for heartbeat keys — set longer than the max threshold (72h) so
+    # keys don't expire before the inactivity checker runs.
+    redis-ttl-hours: 80
+
+  sqs:
+    notification-queue-name: safecircle-notifications
+
+  cognito:
+    # Cognito JWKS endpoint — used to fetch public keys for JWT verification.
+    # Format: https://cognito-idp.{region}.amazonaws.com/{userPoolId}/.well-known/jwks.json
+    # Value overridden in environment-specific configs.
+    jwks-uri: ${COGNITO_JWKS_URI:}
+    user-pool-id: ${COGNITO_USER_POOL_ID:}
+    client-id: ${COGNITO_CLIENT_ID:}

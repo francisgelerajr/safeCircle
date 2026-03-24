@@ -1,0 +1,55 @@
+# PRODUCTION PROFILE
+# Active when: SPRING_PROFILES_ACTIVE=prod (set in ECS task definition environment variables)
+#
+# SECRETS MANAGEMENT CONCEPT:
+# Secrets are NEVER hardcoded here. Instead:
+#   ${VAR_NAME} → reads from an environment variable (set in ECS task definition)
+#   aws.secretsmanager://... → Spring Cloud AWS fetches from Secrets Manager at startup
+#
+# The ECS task role has IAM permissions to read the specific secrets it needs.
+# Nothing else can read them.
+
+spring:
+  datasource:
+    # Aurora endpoint injected as environment variable by Terraform/ECS
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    # Password fetched from AWS Secrets Manager — never in env vars or code
+    password: ${aws.secretsmanager.safecircle/prod/db-password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # HikariCP connection pool settings for production
+      # maximum-pool-size: never open more than this many connections to Aurora.
+      # Aurora has a connection limit — exceeding it causes errors for all services.
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000    # 30s — fail fast if DB is unreachable
+      idle-timeout: 600000         # 10min — close idle connections
+      max-lifetime: 1800000        # 30min — recycle connections to avoid stale ones
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: 6379
+      password: ${aws.secretsmanager.safecircle/prod/redis-password}
+      ssl:
+        enabled: true  # ElastiCache in-transit encryption
+
+spring.cloud.aws:
+  region:
+    static: ap-southeast-1
+  # In ECS, credentials come from the task IAM role — no keys needed
+  credentials:
+    instance-profile: true
+
+safecircle:
+  cognito:
+    jwks-uri: ${COGNITO_JWKS_URI}
+    user-pool-id: ${COGNITO_USER_POOL_ID}
+    client-id: ${COGNITO_CLIENT_ID}
+
+logging:
+  level:
+    com.safecircle: INFO
+    # Keep security logs at WARN in prod — DEBUG would log tokens
+    org.springframework.security: WARN

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        PARENT POM CONCEPT:
+        This file is the root of the multi-module project. It does NOT contain
+        any application code itself. Its job is to:
+          1. Declare the three child modules
+          2. Set the Spring Boot parent (which gives us sane default versions for everything)
+          3. Lock down dependency versions in <dependencyManagement> so every module
+             uses the exact same version of every library — no version conflicts
+          4. Define shared plugins (compiler version, etc.)
+
+        Child modules inherit from this POM using <parent> in their own pom.xml.
+    -->
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.safecircle</groupId>
+    <artifactId>safecircle-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>SafeCircle Parent</name>
+
+    <!-- The three child modules. Maven builds them in this order. -->
+    <modules>
+        <module>safecircle-common</module>
+        <module>safecircle-api</module>
+        <module>safecircle-worker</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <!--
+            Java 21 is the current LTS (Long Term Support) release.
+            WHY LTS? AWS ECS supports it, Spring Boot 3.2 is optimised for it,
+            and it will receive security patches until 2031. Never use a
+            non-LTS Java version in production.
+        -->
+        <spring-cloud-aws.version>3.1.1</spring-cloud-aws.version>
+        <flyway.version>10.8.1</flyway.version>
+        <jjwt.version>0.12.5</jjwt.version>
+        <testcontainers.version>1.19.6</testcontainers.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+    </properties>
+
+    <!--
+        DEPENDENCY MANAGEMENT CONCEPT:
+        <dependencyManagement> does NOT add dependencies to any module.
+        It only declares what version to use IF a module chooses to include that dependency.
+        This is how you prevent "dependency hell" — every module that uses Jackson
+        will get the same version, guaranteed.
+    -->
+    <dependencyManagement>
+        <dependencies>
+
+            <!-- Our own modules — api and worker can depend on common -->
+            <dependency>
+                <groupId>com.safecircle</groupId>
+                <artifactId>safecircle-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Spring Cloud AWS — integrates Spring Boot with SQS, S3, Secrets Manager -->
+            <dependency>
+                <groupId>io.awspring.cloud</groupId>
+                <artifactId>spring-cloud-aws-dependencies</artifactId>
+                <version>${spring-cloud-aws.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Flyway — database migration tool -->
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-core</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+
+            <!-- JJWT — for parsing and validating Cognito JWT tokens -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+            <!-- MapStruct — compile-time mapper between Entity <-> DTO (no reflection at runtime) -->
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+
+            <!-- Testcontainers — spins up real Postgres and Redis in Docker during tests -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <annotationProcessorPaths>
+                            <!--
+                                Lombok generates boilerplate (getters, setters, builders) at compile time.
+                                MapStruct generates mapper implementations at compile time.
+                                Both must be in annotationProcessorPaths so they run BEFORE the compiler.
+                                Order matters: Lombok must come before MapStruct so that MapStruct
+                                can see the Lombok-generated methods when it creates the mapper.
+                            -->
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>1.18.30</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>

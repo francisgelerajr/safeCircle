@@ -1,0 +1,83 @@
+version: '3.9'
+
+# LOCAL DEVELOPMENT ENVIRONMENT
+#
+# Run with: docker compose up -d
+# This starts everything your Spring Boot app needs to run locally:
+#   - PostgreSQL (replaces Aurora)
+#   - Redis (replaces ElastiCache)
+#   - LocalStack (replaces SQS, Secrets Manager — fake AWS locally)
+#
+# DOCKER COMPOSE CONCEPT:
+# Each entry under 'services' is a container. Docker Compose starts them all
+# together and puts them on the same virtual network so they can reach each
+# other by service name (e.g. host "postgres", host "redis").
+#
+# 'ports' maps container-port to host-port: "5432:5432" means
+# your laptop's port 5432 forwards into the postgres container's port 5432.
+# This is how your IDE (or Spring Boot running outside Docker) connects to Postgres.
+#
+# 'volumes' persist data between restarts. Without a volume, your database
+# is wiped every time you run 'docker compose down'.
+# 'healthcheck' tells Docker how to tell if the container is ready.
+# Other containers can use 'depends_on' with condition: service_healthy
+# to wait until Postgres is accepting connections before starting.
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: safecircle-postgres
+    environment:
+      POSTGRES_DB: safecircle_dev
+      POSTGRES_USER: safecircle
+      POSTGRES_PASSWORD: safecircle_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safecircle -d safecircle_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: safecircle-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  localstack:
+    # LocalStack simulates AWS services locally — SQS, S3, Secrets Manager, etc.
+    # No real AWS account or credentials needed during development.
+    image: localstack/localstack:3.3
+    container_name: safecircle-localstack
+    ports:
+      - "4566:4566"    # All AWS services on a single port
+    environment:
+      - SERVICES=sqs,secretsmanager,s3
+      - DEFAULT_REGION=ap-southeast-1
+      - DEBUG=0
+    volumes:
+      - localstack_data:/var/lib/localstack
+      # This script runs on LocalStack startup to create the SQS queue
+      # and any other resources your app needs locally
+      - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  localstack_data:
